@@ -175,7 +175,6 @@
 
   <div class="tabs">
     <button class="tab active" data-tab="board">Board</button>
-    <button class="tab" data-tab="charts">Charts</button>
     <button class="tab" data-tab="issues">Issues</button>
     <button class="tab" data-tab="log">Log</button>
 
@@ -222,42 +221,7 @@
       <div id="locations" class="locations"></div>
     </div>
 
-    <div id="panel-charts" class="panel">
-      <div class="charts">
-        <div class="charts-row center">
-          <div class="chart-card" id="wrap-locations">
-            <div class="chart-title">Totals by Location</div>
-            <div class="chart-wrap">
-              <canvas id="chart-locations" width="280" height="280"></canvas>
-              <div class="legend" id="legend-locations"></div>
-            </div>
-          </div>
-        </div>
-        <div class="charts-row line">
-          <div class="chart-card" id="wrap-amd">
-            <div class="chart-title">AMD — Sections</div>
-            <div class="chart-wrap">
-              <canvas id="chart-amd" width="280" height="280"></canvas>
-              <div class="legend" id="legend-amd"></div>
-            </div>
-          </div>
-          <div class="chart-card" id="wrap-gs">
-            <div class="chart-title">G&amp;S — Sections</div>
-            <div class="chart-wrap">
-              <canvas id="chart-gs" width="280" height="280"></canvas>
-              <div class="legend" id="legend-gs"></div>
-            </div>
-          </div>
-          <div class="chart-card" id="wrap-ferg">
-            <div class="chart-title">Ferguson — Sections</div>
-            <div class="chart-wrap">
-              <canvas id="chart-ferg" width="280" height="280"></canvas>
-              <div class="legend" id="legend-ferg"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    
 
     <div id="panel-issues" class="panel">
       <div class="issues">
@@ -402,13 +366,27 @@
   /* ---------- Selection / Tabs ---------- */
   let selectMode=false; const selection=new Set();
   const tabs=document.querySelectorAll('.tab[data-tab]');
-  const panels={ board:document.getElementById('panel-board'), charts:document.getElementById('panel-charts'), issues:document.getElementById('panel-issues'), log:document.getElementById('panel-log') };
-  tabs.forEach(t=>t.addEventListener('click',()=>{ tabs.forEach(x=>x.classList.remove('active')); t.classList.add('active');
-    const dst=t.dataset.tab; if(dst){ Object.values(panels).forEach(p=>p.classList.remove('active')); panels[dst].classList.add('active');
-      if(dst==='charts') updateCharts();
-      if(dst==='issues') updateIssuesPanel();
-      if(dst==='log') updateLogPanel();
-    }}));
+  const panels = {
+  board: document.getElementById('panel-board'),
+  issues: document.getElementById('panel-issues'),
+  log: document.getElementById('panel-log')
+};
+  tabs.forEach(t => t.addEventListener('click', () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+
+  const dst = t.dataset.tab;
+  if (!dst || !panels[dst]) return;
+
+  Object.values(panels).forEach(p => {
+    if (p) p.classList.remove('active');
+  });
+
+  panels[dst].classList.add('active');
+
+  if (dst === 'issues') updateIssuesPanel();
+  if (dst === 'log') updateLogPanel();
+}));
 
   const selectBtn=document.getElementById('selectModeBtn'), selCount=document.getElementById('selCount'), clearSelBtn=document.getElementById('clearSelBtn');
   selectBtn.onclick=()=>{ selectMode=!selectMode; updateSelectionUI(); applySelectionDecor(); };
@@ -638,7 +616,6 @@ function populateAddSelectors(){
     });
 
     applySelectionDecor();
-    if(document.getElementById('panel-charts').classList.contains('active')) updateCharts();
     if(document.getElementById('panel-issues').classList.contains('active')) updateIssuesPanel();
     if(document.getElementById('panel-log').classList.contains('active')) updateLogPanel();
   }
@@ -668,102 +645,6 @@ function populateAddSelectors(){
     selection.clear(); if(marqueeAppend) marqueeSeed.forEach(id=>selection.add(id)); hits.forEach(id=>selection.add(id));
   }
 
-  /* ---------- Charts ---------- */
-  const paletteSections = ['#0ea5e9','#a78bfa','#ef4444','#22c55e','#f59e0b','#14b8a6','#8b5cf6','#f43f5e','#10b981','#eab308'];
-  const paletteLocations = { AMD:'#2563eb', GS:'#10b981', FERG:'#f59e0b' };
-
-  function updateCharts(){
-    const locData = CONFIG
-  .filter(loc => loc.id !== 'amd')
-  .map(loc => ({
-    key: loc.id,
-    title: loc.title,
-    total: loc.sections.reduce((sum, s) => sum + (state.sections[s.id]?.length || 0), 0)
-  }));
-    drawPie('chart-locations',
-      locData.map(x => x.title),
-      locData.map(x => x.total),
-      [paletteLocations.AMD, paletteLocations.GS, paletteLocations.FERG],
-      'legend-locations'
-    );
-    const amd = CONFIG[0];
-    drawPie('chart-amd',
-      amd.sections.map(s => s.title),
-      amd.sections.map(s => state.sections[s.id]?.length || 0),
-      paletteSections,
-      'legend-amd'
-    );
-    const gs = CONFIG[1];
-    drawPie('chart-gs',
-      gs.sections.map(s => s.title),
-      gs.sections.map(s => state.sections[s.id]?.length || 0),
-      paletteSections,
-      'legend-gs'
-    );
-    const ferg = CONFIG[2];
-    drawPie('chart-ferg',
-      ferg.sections.map(s => s.title),
-      ferg.sections.map(s => state.sections[s.id]?.length || 0),
-      paletteSections,
-      'legend-ferg'
-    );
-  }
-
-  function drawPie(canvasId, labels, values, colors, legendId){
-    const canvas = document.getElementById(canvasId);
-    const legend = document.getElementById(legendId);
-    if(!canvas || !legend) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    const total = values.reduce((a,b)=>a+b,0);
-    const cx = canvas.width/2, cy = canvas.height/2;
-    const radius = Math.min(canvas.width, canvas.height)/2 - 10;
-    const inner = radius * 0.55;
-
-    if(total === 0){
-      ctx.fillStyle = '#e5e7eb';
-      ctx.beginPath(); ctx.arc(cx, cy, radius, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(cx, cy, inner, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#64748b'; ctx.font='14px ui-sans-serif';
-      const msg = 'No data';
-      ctx.fillText(msg, cx - ctx.measureText(msg).width/2, cy + 5);
-      legend.innerHTML = '';
-      return;
-    }
-
-    let start = -Math.PI/2;
-    values.forEach((v, i) => {
-      const frac = v/total, angle = frac * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, radius, start, start + angle);
-      ctx.closePath();
-      ctx.fillStyle = colors[i % colors.length];
-      ctx.fill();
-      start += angle;
-    });
-
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.beginPath(); ctx.arc(cx, cy, inner, 0, Math.PI*2); ctx.fill();
-    ctx.globalCompositeOperation = 'source-over';
-
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 18px ui-sans-serif';
-    ctx.fillText(String(total), cx - ctx.measureText(String(total)).width/2, cy + 6);
-
-    legend.innerHTML = '';
-    labels.forEach((label, i) => {
-      const row = document.createElement('div'); row.className='legend-item';
-      const sw = document.createElement('span'); sw.className='legend-swatch'; sw.style.background = colors[i % colors.length];
-      const txt = document.createElement('span');
-      const v = values[i];
-      const pct = total ? ((v/total)*100).toFixed(1) : '0.0';
-      txt.textContent = `${label}: ${v} (${pct}%)`;
-      row.append(sw, txt); legend.appendChild(row);
-    });
-  }
 
   /* ---------- Issues Tab ---------- */
   function cardToSectionMap(){
@@ -879,7 +760,6 @@ function populateAddSelectors(){
   populateAddSelectors();
   render();
 })();
-</script>
 </script>
 </body>
 </html>
